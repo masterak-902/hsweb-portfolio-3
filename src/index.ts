@@ -1,14 +1,18 @@
-import { Hono } from 'hono'
 import { z } from 'zod'
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { basicAuth } from 'hono/basic-auth'
-import { HTTPException } from 'hono/http-exception'
+import { sign, verify, jwt } from 'hono/jwt'
 import { prettyJSON } from 'hono/pretty-json'
 import { zValidator } from '@hono/zod-validator'
-import { sign, verify, jwt } from 'hono/jwt'
-import { cors } from 'hono/cors'
+import { HTTPException } from 'hono/http-exception'
 
-const app = new Hono();
+import type { JwtVariables } from 'hono/jwt'
+
+type Variables = JwtVariables
+
+const app = new Hono<{ Variables: Variables }>();
 
 // Hono Logger middleware
 app.use(logger());
@@ -123,7 +127,7 @@ api.post('/login', async (c) => {
   const payload = {
     sub: 'user',
     role: 'admin',
-    exp: Math.floor(Date.now() / 1000) + 60 * 5, // Token expires in 5 minutes
+    exp: Math.floor(Date.now() / 1000) + (60 * 60) // 60min
   }
   const secret = c.env.JWT_SECRET
   const token = await sign(payload, secret, "HS256");
@@ -146,6 +150,29 @@ api.post('/login', async (c) => {
 // decode()
 // This function decodes a JWT token without performing signature verification.
 // It extracts and returns the header and payload from the token.
+api.get('/get_decode', async (c) => {
+  console.log('Received request at /api/get_decode')
+
+  const tokenToVerify = c.req.header('Authorization')
+  console.log('Authorization header:', tokenToVerify)
+
+  if (!tokenToVerify) {
+    console.log('No token provided')
+    throw new HTTPException(401, { message: 'Unauthorized' })
+  }
+
+  const secret = c.env.JWT_SECRET
+  console.log('Secret:', secret)
+
+  try {
+    const decodedPayload = await verify(tokenToVerify.split(' ')[1], secret)
+    console.log('Decoded payload:', decodedPayload)
+    return c.json(decodedPayload)
+  } catch (error) {
+    console.error('Token verification failed:', error)
+    throw new HTTPException(401, { message: 'Invalid token' })
+  }
+})
 
 app.route('/api', api)
 
