@@ -63,10 +63,8 @@ api.use('/sender/*', async (c, next) => {
   if (apiKey !== API_KEY) {
     throw new HTTPException(403, { message: 'Forbidden' })
   }
-
   await next()
-
-  });
+});
 
 api.post(
   '/sender',
@@ -85,8 +83,8 @@ api.post(
       console.error(error)
       return c.json({ isSuccessful:'false', message: 'Failed to send message. Please try again in a few moments.' }, 500);
     }
-    
-    });
+  }
+);
 
 // --------------------------------------------------------------
 
@@ -108,29 +106,29 @@ api.post(
 
 api.use('/login/*', cors());
 
-api.post('/login',
+api.post('/login', async (c) => {
+
   // FIX(2024/0728): hardcoded username and password
   basicAuth({
-    username: 'hono',
-    password: 'acoolproject',
-    realm: 'Secure Area'
-  }),
-  async (c) => {
-    // Create a JWT token.
-    // sub  : Identifier to uniquely identify the user
-    // role : The concept is used to determine the user's privileges and access levels within the system
-    // exp  : Indicates the expiry date of the token.
-    // FIX(2024/07/28): hardcoded payload
-    const payload = {
-      sub: 'user',
-      role: 'admin',
-      exp: Math.floor(Date.now() / 1000) + 60 * 5, // Token expires in 5 minutes
-    }
-    const secret = c.env.JWT_SECRET
-    const token = await sign(payload, secret, "HS256");
-    return c.json(token);
+    username: c.env.USERNAME,
+    password: c.env.PASSWORD,
+    // realm: 'Secure Area'
+  });
+
+  // Create a JWT token.
+  // sub  : Identifier to uniquely identify the user
+  // role : The concept is used to determine the user's privileges and access levels within the system
+  // exp  : Indicates the expiry date of the token.
+  // FIX(2024/07/28): hardcoded payload
+  const payload = {
+    sub: 'user',
+    role: 'admin',
+    exp: Math.floor(Date.now() / 1000) + 60 * 5, // Token expires in 5 minutes
   }
-);
+  const secret = c.env.JWT_SECRET
+  const token = await sign(payload, secret, "HS256");
+  return c.json(token);
+});
 
 // #2 GET requests, token verification.
 // - 1. Check the token in the cookie.
