@@ -5,7 +5,7 @@ import { basicAuth } from 'hono/basic-auth'
 import { HTTPException } from 'hono/http-exception'
 import { prettyJSON } from 'hono/pretty-json'
 import { zValidator } from '@hono/zod-validator'
-import { jwt } from 'hono/jwt'
+import { sign, verify, jwt } from 'hono/jwt'
 import { cors } from 'hono/cors'
 
 const app = new Hono();
@@ -25,7 +25,7 @@ app.get('/ping', (c) => { return c.text('hsweb api is alive.') });
 // Binding of API credentials.
 type Bindings = {
   API_KEY: string
-  SECRET_KEY: string
+  JWT_SECRET: string
   USERNAME: string
   PASSWORD: string
 }
@@ -96,18 +96,53 @@ api.post(
 
 // #1 POST Login authentication and token issuance.
 // - 1. Log-in process with BASIC authentication.
-// - 2. 
-api.use('/auth/*', cors());
+// - 2. Create JWT's, set them in cookies and return them.
 
-api.post('/auth',
+// Sign method.
+// sign(
+//   payload: unknown,
+//   secret: string,
+//   alg?: 'HS256';
+//   ): Promise<string>;
+
+api.use('/login/*', cors());
+
+api.post('/login',
   basicAuth({
     username: 'hono',
-    password: 'acoolproject'
+    password: 'acoolproject',
+    realm: 'Secure Area'
   }),
   async (c) => {
+
+    // Create a JWT token.
+    const payload = {
+      sub: 'user123',
+      role: 'admin',
+      exp: Math.floor(Date.now() / 1000) + 60 * 5, // Token expires in 5 minutes
+    }
+    const secret = c.env.JWT_SECRET
+    const token = await sign(payload, secret, "HS256");
     return c.text('You are authorized');
   }
 );
+
+// #2 GET requests, token verification.
+// - 1. Check the token in the cookie.
+// - 2. If the token is valid, return the message "You are authorized".
+// - 3. If the token is invalid, return the message "Unauthorized".
+
+// JWT as middleware.
+// https://hono.dev/docs/middleware/builtin/jwt
+// Automatically validates tokens on receipt of a request, simplifying the authentication process.
+
+// verify()
+// This function checks if a JWT token is genuine and still valid.
+//  It ensures the token hasn't been altered and checks validity only if you added Payload Validation.
+
+//decode()
+// This function decodes a JWT token without performing signature verification.
+// It extracts and returns the header and payload from the token.
 
 app.route('/api', api)
 
