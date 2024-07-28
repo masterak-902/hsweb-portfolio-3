@@ -24,10 +24,10 @@ app.get('/ping', (c) => { return c.text('hsweb api is alive.') });
 
 // Binding of API credentials.
 type Bindings = {
-  API_KEY: string
+  API_KEY   : string
   JWT_SECRET: string
-  USERNAME: string
-  PASSWORD: string
+  USERNAME  : string
+  PASSWORD  : string
 }
 
 const api = new Hono<{ Bindings: Bindings }>();
@@ -98,32 +98,37 @@ api.post(
 // - 1. Log-in process with BASIC authentication.
 // - 2. Create JWT's, set them in cookies and return them.
 
-// Sign method.
+// sign()
+// This function generates a JWT token by encoding a payload and signing it using the specified algorithm and secret.
 // sign(
-//   payload: unknown,
-//   secret: string,
-//   alg?: 'HS256';
+//   payload : unknown,
+//   secret  : string,
+//   alg?    : 'HS256';
 //   ): Promise<string>;
 
 api.use('/login/*', cors());
 
 api.post('/login',
+  // FIX(2024/0728): hardcoded username and password
   basicAuth({
     username: 'hono',
     password: 'acoolproject',
     realm: 'Secure Area'
   }),
   async (c) => {
-
     // Create a JWT token.
+    // sub  : Identifier to uniquely identify the user
+    // role : The concept is used to determine the user's privileges and access levels within the system
+    // exp  : Indicates the expiry date of the token.
+    // FIX(2024/07/28): hardcoded payload
     const payload = {
-      sub: 'user123',
+      sub: 'user',
       role: 'admin',
       exp: Math.floor(Date.now() / 1000) + 60 * 5, // Token expires in 5 minutes
     }
     const secret = c.env.JWT_SECRET
     const token = await sign(payload, secret, "HS256");
-    return c.text('You are authorized');
+    return c.json(token);
   }
 );
 
@@ -138,9 +143,9 @@ api.post('/login',
 
 // verify()
 // This function checks if a JWT token is genuine and still valid.
-//  It ensures the token hasn't been altered and checks validity only if you added Payload Validation.
+// It ensures the token hasn't been altered and checks validity only if you added Payload Validation.
 
-//decode()
+// decode()
 // This function decodes a JWT token without performing signature verification.
 // It extracts and returns the header and payload from the token.
 
