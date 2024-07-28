@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { logger } from 'hono/logger'
+import { basicAuth } from 'hono/basic-auth'
 import { HTTPException } from 'hono/http-exception'
 import { prettyJSON } from 'hono/pretty-json'
 import { zValidator } from '@hono/zod-validator'
 import { jwt } from 'hono/jwt'
+import { cors } from 'hono/cors'
 
 const app = new Hono();
 
@@ -24,6 +26,8 @@ app.get('/ping', (c) => { return c.text('hsweb api is alive.') });
 type Bindings = {
   API_KEY: string
   SECRET_KEY: string
+  USERNAME: string
+  PASSWORD: string
 }
 
 const api = new Hono<{ Bindings: Bindings }>();
@@ -37,7 +41,7 @@ const api = new Hono<{ Bindings: Bindings }>();
 // 2. Zod Validation
 //    OK -> Continue
 //    Error -> Return error message."Invalid data. Please check the data and try again."
-// 3. OK -> Send message to host email.
+// 3. OK -> Send message to host email. return message. "Message successfully sent."
 //    Error -> Return error message."Failed to send message. Please try again in a few moments."      
 // 4. If all is OK, return "OK". Otherwise, return an "Error".
 //Schema for receiving messages.
@@ -79,28 +83,31 @@ api.post(
       return c.json({ isSuccessful:'true', message: 'Message successfully sent.' }, 200);
     } catch (error) {
       console.error(error)
-      return c.json({ isSuccessful:'false', message: 'Internal Server Error' }, 500);
+      return c.json({ isSuccessful:'false', message: 'Failed to send message. Please try again in a few moments.' }, 500);
     }
     
     });
 
 // --------------------------------------------------------------
 
-// Login endpoint.
-// JWT is returned when the correct email and password are entered.
+// Login and JWT actions. 
+// #1 POST Login authentication and token issuance.
+// #2 GET requests, token verification.
 
+// #1 POST Login authentication and token issuance.
+// - 1. Log-in process with BASIC authentication.
+// - 2. 
+api.use('/auth/*', cors());
 
-api.use('/auth/*', async (c, next) => {
-  jwt({ 
-    secret: c.env.SECRET_KEY,
-    alg: 'HS256'
-    })
-});
-
-api.get("/auth/page", (c) => {
-  const payload = c.get('jwtPayload')
-  return c.json(payload)
-});
+api.post('/auth',
+  basicAuth({
+    username: 'hono',
+    password: 'acoolproject'
+  }),
+  async (c) => {
+    return c.text('You are authorized');
+  }
+);
 
 app.route('/api', api)
 
