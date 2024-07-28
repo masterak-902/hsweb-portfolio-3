@@ -150,24 +150,20 @@ api.post('/login', async (c) => {
 // decode()
 // This function decodes a JWT token without performing signature verification.
 // It extracts and returns the header and payload from the token.
+
+// FIX: 2024/07/28 api.get -> api.use, return c.text('You are authorized')　-> GET: Retrieve data from the KVS
 api.get('/get_decode', async (c) => {
-  console.log('Received request at /api/get_decode')
-
-  const tokenToVerify = c.req.header('Authorization')
-  console.log('Authorization header:', tokenToVerify)
-
+  const tokenToVerify = c.req.header('Authorization');
   if (!tokenToVerify) {
-    console.log('No token provided')
+    console.log('No token')
     throw new HTTPException(401, { message: 'Unauthorized' })
   }
 
   const secret = c.env.JWT_SECRET
-  console.log('Secret:', secret)
 
   try {
-    const decodedPayload = await verify(tokenToVerify.split(' ')[1], secret)
-    console.log('Decoded payload:', decodedPayload)
-    return c.json(decodedPayload)
+    const decodedPayload = await verify(tokenToVerify.split(' ')[1], secret);
+    return c.text('You are authorized')
   } catch (error) {
     console.error('Token verification failed:', error)
     throw new HTTPException(401, { message: 'Invalid token' })
