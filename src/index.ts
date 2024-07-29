@@ -108,7 +108,24 @@ api.post(
 //   alg?    : 'HS256';
 //   ): Promise<string>;
 
-api.use('/login/*', cors());
+// origin: 'http://localhost:3000' -> Deno test origin
+// FIX(2024/0729): Origin is hardcoded. .env.CORS_ORIGIN should be used.
+// allowHeaders: ['Upgrade-Insecure-Requests'] -> Used by the client to request the server to upgrade from HTTP to HTTPS.
+//                                                To enhance security, the client informs the server that it is establishing a secure connection.
+// exposeHeaders: ['Content-Length'] -> Specifies the size (in bytes) of the response body. 
+//                                      The client can use this information to check the integrity of the response and to indicate progress.
+api.use('/login/*',   cors({
+  origin: 'http://localhost:3000',
+  allowHeaders: ['Authorization', 'Content-Type'],
+  allowMethods: ['POST', 'GET'],
+  maxAge: 1800,
+  credentials: true,
+  }
+));
+
+api.get('/login', async (c) => {
+  return c.json('token');
+});
 
 api.post('/login', async (c) => {
 
@@ -152,20 +169,21 @@ api.post('/login', async (c) => {
 // It extracts and returns the header and payload from the token.
 
 // FIX: 2024/07/28 api.get -> api.use, return c.text('You are authorized')　-> GET: Retrieve data from the KVS
-api.get('/get_decode', async (c) => {
+api.use('/get/*', async (c) => {
   const tokenToVerify = c.req.header('Authorization');
+
   if (!tokenToVerify) {
-    console.log('No token')
-    throw new HTTPException(401, { message: 'Unauthorized' })
+    throw new HTTPException(401, { message: 'No authorisation.' })
   }
 
+  console.log(tokenToVerify);
   const secret = c.env.JWT_SECRET
 
   try {
     const decodedPayload = await verify(tokenToVerify.split(' ')[1], secret);
     return c.text('You are authorized')
   } catch (error) {
-    console.error('Token verification failed:', error)
+    console.log('Invalid token detection.:', error)
     throw new HTTPException(401, { message: 'Invalid token' })
   }
 })
