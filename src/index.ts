@@ -10,6 +10,7 @@ import { HTTPException } from 'hono/http-exception'
 
 import type { JwtVariables } from 'hono/jwt'
 
+
 type Variables = JwtVariables
 
 const app = new Hono<{ Variables: Variables }>();
@@ -24,7 +25,7 @@ app.use(prettyJSON());
 app.notFound((c) => c.json({ message: 'Not Found', ok: false }, 404));
 
 // Is the server alive ?
-app.get('/ping', (c) => { return c.text('hsweb api is alive.') });
+app.get('/ping', (c) => { return c.text('hsweb app is alive.') });
 
 // Binding of API credentials.
 type Bindings = {
@@ -35,6 +36,37 @@ type Bindings = {
 }
 
 const api = new Hono<{ Bindings: Bindings }>();
+
+// https://hono.dev/docs/middleware/builtin/cors
+// origin: 'http://localhost:3000' -> Deno test origin
+// FIX(2024/0729): Origin is hardcoded. .env.CORS_ORIGIN should be used.
+// allowHeaders: ['Upgrade-Insecure-Requests'] -> Used by the client to request the server to upgrade from HTTP to HTTPS.
+//                                                To enhance security, the client informs the server that it is establishing a secure connection.
+// exposeHeaders: ['Content-Length'] -> Specifies the size (in bytes) of the response body. 
+//                                      The client can use this information to check the integrity of the response and to indicate progress.
+// Function
+// It is strongly recommended that the protocol be verified to ensure a match to `$`.
+// You should *never* do a forward match.
+// app.use(
+//   '*',
+//   csrf({
+//     origin: (origin) =>
+//       /https:\/\/(\w+\.)?myapp\.example\.com$/.test(origin),
+//   })
+// )
+
+api.use('/*', 
+  cors({
+    origin: 'http://localhost:8000',
+    allowHeaders: ['Authorization', 'Content-Type', 'X-API-KEY'],
+    allowMethods: ['POST', 'GET', 'OPTIONS'],
+    maxAge: 1800,
+    exposeHeaders: ['Content-Length'],
+    credentials: true,
+    }),
+);
+
+api.get('/ping', (c) => { return c.text('hsweb api is alive.') });
 
 // --------------------------------------------------------------
 
@@ -108,8 +140,6 @@ api.post(
 //   alg?    : 'HS256';
 //   ): Promise<string>;
 
-api.use('/login/*', cors());
-
 api.post('/login', async (c) => {
 
   // FIX(2024/0728): hardcoded username and password
@@ -125,8 +155,8 @@ api.post('/login', async (c) => {
   // exp  : Indicates the expiry date of the token.
   // FIX(2024/07/28): hardcoded payload
   const payload = {
-    sub: 'user',
-    role: 'admin',
+    sub: '1-CXX-112',
+    role: 'guest',
     exp: Math.floor(Date.now() / 1000) + (60 * 60) // 60min
   }
   const secret = c.env.JWT_SECRET
@@ -150,29 +180,29 @@ api.post('/login', async (c) => {
 // decode()
 // This function decodes a JWT token without performing signature verification.
 // It extracts and returns the header and payload from the token.
-api.get('/get_decode', async (c) => {
-  console.log('Received request at /api/get_decode')
 
-  const tokenToVerify = c.req.header('Authorization')
-  console.log('Authorization header:', tokenToVerify)
-
+// FIX: 2024/07/28 api.get -> api.use, return c.text('You are authorized')　-> GET: Retrieve data from the KVS
+api.use('/access/*', async (c, next) => {
+  const tokenToVerify = c.req.header('Authorization');
+  
   if (!tokenToVerify) {
-    console.log('No token provided')
-    throw new HTTPException(401, { message: 'Unauthorized' })
+    console.log('Tokenless communication.');
+    throw new HTTPException(401, { message: 'Not authorised.' })
   }
 
+  console.log('Token:',tokenToVerify);
   const secret = c.env.JWT_SECRET
-  console.log('Secret:', secret)
 
   try {
-    const decodedPayload = await verify(tokenToVerify.split(' ')[1], secret)
-    console.log('Decoded payload:', decodedPayload)
-    return c.json(decodedPayload)
+    await verify(tokenToVerify.split(' ')[1], secret);
+    await next();
   } catch (error) {
-    console.error('Token verification failed:', error)
-    throw new HTTPException(401, { message: 'Invalid token' })
+    console.log('Invalid token detection.:', error)
+    throw new HTTPException(401, { message: 'Not authorised.' })
   }
-})
+});
+
+api.get('/access', (c) => { return c.text('You are authorized') });
 
 app.route('/api', api)
 
