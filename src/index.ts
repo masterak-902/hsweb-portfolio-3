@@ -140,14 +140,18 @@ api.post(
 //   alg?    : 'HS256';
 //   ): Promise<string>;
 
-api.post('/login', async (c) => {
-
+api.use('/login/*', async (c, next) => {
   // FIX(2024/0728): hardcoded username and password
   basicAuth({
     username: c.env.USERNAME,
     password: c.env.PASSWORD,
     // realm: 'Secure Area'
   });
+
+  await next();
+});
+
+api.get('/login', async (c) => {
 
   // Create a JWT token.
   // sub  : Identifier to uniquely identify the user
@@ -202,7 +206,7 @@ api.use('/access/*', async (c, next) => {
   }
 });
 
-api.get('/access', (c) => { return c.text('You are authorized') });
+api.get('/access', (c) => { return c.json('You are authorized') });
 
 app.route('/api', api)
 
