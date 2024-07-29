@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { csrf } from 'hono/csrf'
 import { logger } from 'hono/logger'
 import { basicAuth } from 'hono/basic-auth'
 import { sign, verify, jwt } from 'hono/jwt'
@@ -9,6 +10,7 @@ import { zValidator } from '@hono/zod-validator'
 import { HTTPException } from 'hono/http-exception'
 
 import type { JwtVariables } from 'hono/jwt'
+
 
 type Variables = JwtVariables
 
@@ -35,6 +37,35 @@ type Bindings = {
 }
 
 const api = new Hono<{ Bindings: Bindings }>();
+
+// https://hono.dev/docs/middleware/builtin/cors
+// origin: 'http://localhost:3000' -> Deno test origin
+// FIX(2024/0729): Origin is hardcoded. .env.CORS_ORIGIN should be used.
+// allowHeaders: ['Upgrade-Insecure-Requests'] -> Used by the client to request the server to upgrade from HTTP to HTTPS.
+//                                                To enhance security, the client informs the server that it is establishing a secure connection.
+// exposeHeaders: ['Content-Length'] -> Specifies the size (in bytes) of the response body. 
+//                                      The client can use this information to check the integrity of the response and to indicate progress.
+// Function
+// It is strongly recommended that the protocol be verified to ensure a match to `$`.
+// You should *never* do a forward match.
+// app.use(
+//   '*',
+//   csrf({
+//     origin: (origin) =>
+//       /https:\/\/(\w+\.)?myapp\.example\.com$/.test(origin),
+//   })
+// )
+
+api.use('/*', 
+  cors({
+    origin: 'http://localhost:3000',
+    allowHeaders: ['Authorization', 'Content-Type', 'X-API-KEY', 'X-CSRF-Token'],
+    allowMethods: ['POST', 'GET'],
+    maxAge: 1800,
+    exposeHeaders: ['Content-Length'],
+    credentials: true,
+    }),
+);
 
 // --------------------------------------------------------------
 
@@ -107,25 +138,6 @@ api.post(
 //   secret  : string,
 //   alg?    : 'HS256';
 //   ): Promise<string>;
-
-// origin: 'http://localhost:3000' -> Deno test origin
-// FIX(2024/0729): Origin is hardcoded. .env.CORS_ORIGIN should be used.
-// allowHeaders: ['Upgrade-Insecure-Requests'] -> Used by the client to request the server to upgrade from HTTP to HTTPS.
-//                                                To enhance security, the client informs the server that it is establishing a secure connection.
-// exposeHeaders: ['Content-Length'] -> Specifies the size (in bytes) of the response body. 
-//                                      The client can use this information to check the integrity of the response and to indicate progress.
-api.use('/login/*',   cors({
-  origin: 'http://localhost:3000',
-  allowHeaders: ['Authorization', 'Content-Type'],
-  allowMethods: ['POST', 'GET'],
-  maxAge: 1800,
-  credentials: true,
-  }
-));
-
-api.get('/login', async (c) => {
-  return c.json('token');
-});
 
 api.post('/login', async (c) => {
 
