@@ -57,7 +57,7 @@ const api = new Hono<{ Bindings: Bindings }>();
 
 api.use('/*', 
   cors({
-    origin: 'http://localhost:3000',
+    origin: 'http://localhost:8000',
     allowHeaders: ['Authorization', 'Content-Type', 'X-API-KEY'],
     allowMethods: ['POST', 'GET', 'OPTIONS'],
     maxAge: 1800,
