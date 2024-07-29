@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { csrf } from 'hono/csrf'
 import { logger } from 'hono/logger'
 import { basicAuth } from 'hono/basic-auth'
 import { sign, verify, jwt } from 'hono/jwt'
@@ -26,7 +25,7 @@ app.use(prettyJSON());
 app.notFound((c) => c.json({ message: 'Not Found', ok: false }, 404));
 
 // Is the server alive ?
-app.get('/ping', (c) => { return c.text('hsweb api is alive.') });
+app.get('/ping', (c) => { return c.text('hsweb app is alive.') });
 
 // Binding of API credentials.
 type Bindings = {
@@ -59,13 +58,15 @@ const api = new Hono<{ Bindings: Bindings }>();
 api.use('/*', 
   cors({
     origin: 'http://localhost:3000',
-    allowHeaders: ['Authorization', 'Content-Type', 'X-API-KEY', 'X-CSRF-Token'],
-    allowMethods: ['POST', 'GET'],
+    allowHeaders: ['Authorization', 'Content-Type', 'X-API-KEY'],
+    allowMethods: ['POST', 'GET', 'OPTIONS'],
     maxAge: 1800,
     exposeHeaders: ['Content-Length'],
     credentials: true,
     }),
 );
+
+api.get('/ping', (c) => { return c.text('hsweb api is alive.') });
 
 // --------------------------------------------------------------
 
@@ -154,8 +155,8 @@ api.post('/login', async (c) => {
   // exp  : Indicates the expiry date of the token.
   // FIX(2024/07/28): hardcoded payload
   const payload = {
-    sub: 'user',
-    role: 'admin',
+    sub: '1-CXX-112',
+    role: 'guest',
     exp: Math.floor(Date.now() / 1000) + (60 * 60) // 60min
   }
   const secret = c.env.JWT_SECRET
@@ -181,24 +182,27 @@ api.post('/login', async (c) => {
 // It extracts and returns the header and payload from the token.
 
 // FIX: 2024/07/28 api.get -> api.use, return c.text('You are authorized')　-> GET: Retrieve data from the KVS
-api.use('/get/*', async (c) => {
+api.use('/access/*', async (c, next) => {
   const tokenToVerify = c.req.header('Authorization');
-
+  
   if (!tokenToVerify) {
-    throw new HTTPException(401, { message: 'No authorisation.' })
+    console.log('Tokenless communication.');
+    throw new HTTPException(401, { message: 'Not authorised.' })
   }
 
-  console.log(tokenToVerify);
+  console.log('Token:',tokenToVerify);
   const secret = c.env.JWT_SECRET
 
   try {
-    const decodedPayload = await verify(tokenToVerify.split(' ')[1], secret);
-    return c.text('You are authorized')
+    await verify(tokenToVerify.split(' ')[1], secret);
+    await next();
   } catch (error) {
     console.log('Invalid token detection.:', error)
-    throw new HTTPException(401, { message: 'Invalid token' })
+    throw new HTTPException(401, { message: 'Not authorised.' })
   }
-})
+});
+
+api.get('/access', (c) => { return c.text('You are authorized') });
 
 app.route('/api', api)
 
