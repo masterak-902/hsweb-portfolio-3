@@ -104,7 +104,7 @@ app.post(
   '/sender',
   zValidator('json', messageSchema, (result, c) => {
     if(!result.success) {
-      throw new HTTPException(403);
+      return c.json({ isSuccessful:'false', message: '不正なデータが入力されています。' }, 400);
       }
     }),
   (c) => { 
