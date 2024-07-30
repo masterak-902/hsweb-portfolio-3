@@ -76,7 +76,9 @@ type Bindings = {
 // 3. OK -> Send message to host email. return message. "Message successfully sent."
 //    Error -> Return error message."Failed to send message. Please try again in a few moments."      
 // 4. If all is OK, return "OK". Otherwise, return an "Error".
-//Schema for receiving messages.
+// Schema for receiving messages.
+// Turnstile documents (server-side)
+// https://developers.cloudflare.com/turnstile/get-started/server-side-validation/
 
 const messageSchema = z.object({
   email: z.string()
@@ -102,7 +104,7 @@ app.post(
   '/sender',
   zValidator('json', messageSchema, (result, c) => {
     if(!result.success) {
-      return c.json( { isSuccessful:'false', message: '入力内容にエラーが発生しました。' }, 400) 
+      throw new HTTPException(403);
       }
     }),
   (c) => { 
