@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
-import { basicAuth } from 'hono/basic-auth'
-import { sign, verify, jwt } from 'hono/jwt'
+// import { basicAuth } from 'hono/basic-auth'
+// import { sign, verify, jwt } from 'hono/jwt'
 import { prettyJSON } from 'hono/pretty-json'
 import { zValidator } from '@hono/zod-validator'
 import { HTTPException } from 'hono/http-exception'
@@ -13,7 +13,7 @@ import type { JwtVariables } from 'hono/jwt'
 
 type Variables = JwtVariables
 
-const app = new Hono<{ Variables: Variables }>();
+const app = new Hono<{ Bindings: Bindings, Variables: Variables }>();
 
 // Hono Logger middleware
 app.use(logger());
@@ -35,8 +35,6 @@ type Bindings = {
   PASSWORD  : string
 }
 
-const api = new Hono<{ Bindings: Bindings }>();
-
 // https://hono.dev/docs/middleware/builtin/cors
 // origin: 'http://localhost:3000' -> Deno test origin
 // FIX(2024/0729): Origin is hardcoded. .env.CORS_ORIGIN should be used.
@@ -55,18 +53,16 @@ const api = new Hono<{ Bindings: Bindings }>();
 //   })
 // )
 
-api.use('/*', 
-  cors({
-    origin: 'http://localhost:8000',
-    allowHeaders: ['Authorization', 'Content-Type', 'X-API-KEY'],
-    allowMethods: ['POST', 'GET', 'OPTIONS'],
-    maxAge: 1800,
-    exposeHeaders: ['Content-Length'],
-    credentials: true,
-    }),
-);
-
-api.get('/ping', (c) => { return c.text('hsweb api is alive.') });
+// app.use( 
+//   cors({
+//     origin: 'http://localhost:8000',
+//     allowHeaders: ['Authorization', 'Content-Type', 'X-API-KEY'],
+//     allowMethods: ['POST', 'GET', 'OPTIONS'],
+//     maxAge: 1800,
+//     exposeHeaders: ['Content-Length'],
+//     credentials: true,
+//     }),
+// );
 
 // --------------------------------------------------------------
 
@@ -80,7 +76,9 @@ api.get('/ping', (c) => { return c.text('hsweb api is alive.') });
 // 3. OK -> Send message to host email. return message. "Message successfully sent."
 //    Error -> Return error message."Failed to send message. Please try again in a few moments."      
 // 4. If all is OK, return "OK". Otherwise, return an "Error".
-//Schema for receiving messages.
+// Schema for receiving messages.
+// Turnstile documents (server-side)
+// https://developers.cloudflare.com/turnstile/get-started/server-side-validation/
 
 const messageSchema = z.object({
   email: z.string()
@@ -93,31 +91,31 @@ const messageSchema = z.object({
     .regex(/^[^<>"'\\/]*$/),
 });
 
-api.use('/sender/*', async (c, next) => {
+app.use('/sender/*', async (c, next) => {
   const apiKey = c.req.header('X-API-KEY')
   const API_KEY = c.env.API_KEY
   if (apiKey !== API_KEY) {
-    throw new HTTPException(403, { message: 'Forbidden' })
+    throw new HTTPException(403);
   }
   await next()
 });
 
-api.post(
+app.post(
   '/sender',
   zValidator('json', messageSchema, (result, c) => {
     if(!result.success) {
-      return c.json( { isSuccessful:'false', message: 'Invalid data. Please check the data and try again.' }, 400) 
+      return c.json({ isSuccessful:'false', message: '不正なデータが入力されています。' }, 400);
       }
     }),
-  async (c) => { 
+  (c) => { 
     try {
       const data = c.req.valid('json')
       console.log(data.email, data.message);
       // TODO(2024/07/27) Sending email method.
-      return c.json({ isSuccessful:'true', message: 'Message successfully sent.' }, 200);
+      return c.json({ isSuccessful:'true', message: 'お問い合わせを受け付けました。' }, 200);
     } catch (error) {
       console.error(error)
-      return c.json({ isSuccessful:'false', message: 'Failed to send message. Please try again in a few moments.' }, 500);
+      return c.json({ isSuccessful:'false', message: 'サーバーが停止しています。しばらくしてからもう一度お試しください。' }, 500);
     }
   }
 );
@@ -140,29 +138,33 @@ api.post(
 //   alg?    : 'HS256';
 //   ): Promise<string>;
 
-api.post('/login', async (c) => {
+// api.use('/login/*', async (c, next) => {
+//   // FIX(2024/0728): hardcoded username and password
+//   basicAuth({
+//     username: c.env.USERNAME,
+//     password: c.env.PASSWORD,
+//     // realm: 'Secure Area'
+//   });
 
-  // FIX(2024/0728): hardcoded username and password
-  basicAuth({
-    username: c.env.USERNAME,
-    password: c.env.PASSWORD,
-    // realm: 'Secure Area'
-  });
+//   await next();
+// });
 
-  // Create a JWT token.
-  // sub  : Identifier to uniquely identify the user
-  // role : The concept is used to determine the user's privileges and access levels within the system
-  // exp  : Indicates the expiry date of the token.
-  // FIX(2024/07/28): hardcoded payload
-  const payload = {
-    sub: '1-CXX-112',
-    role: 'guest',
-    exp: Math.floor(Date.now() / 1000) + (60 * 60) // 60min
-  }
-  const secret = c.env.JWT_SECRET
-  const token = await sign(payload, secret, "HS256");
-  return c.json(token);
-});
+// api.get('/login', async (c) => {
+
+//   // Create a JWT token.
+//   // sub  : Identifier to uniquely identify the user
+//   // role : The concept is used to determine the user's privileges and access levels within the system
+//   // exp  : Indicates the expiry date of the token.
+//   // FIX(2024/07/28): hardcoded payload
+//   const payload = {
+//     sub: '1-CXX-112',
+//     role: 'guest',
+//     exp: Math.floor(Date.now() / 1000) + (60 * 60) // 60min
+//   }
+//   const secret = c.env.JWT_SECRET
+//   const token = await sign(payload, secret, "HS256");
+//   return c.json(token);
+// });
 
 // #2 GET requests, token verification.
 // - 1. Check the token in the cookie.
@@ -182,29 +184,30 @@ api.post('/login', async (c) => {
 // It extracts and returns the header and payload from the token.
 
 // FIX: 2024/07/28 api.get -> api.use, return c.text('You are authorized')　-> GET: Retrieve data from the KVS
-api.use('/access/*', async (c, next) => {
-  const tokenToVerify = c.req.header('Authorization');
+
+// api.use('/access/*', async (c, next) => {
+//   const tokenToVerify = c.req.header('Authorization');
   
-  if (!tokenToVerify) {
-    console.log('Tokenless communication.');
-    throw new HTTPException(401, { message: 'Not authorised.' })
-  }
+//   if (!tokenToVerify) {
+//     console.log('Tokenless communication.');
+//     throw new HTTPException(401, { message: 'Not authorised.' })
+//   }
 
-  console.log('Token:',tokenToVerify);
-  const secret = c.env.JWT_SECRET
+//   console.log('Token:',tokenToVerify);
+//   const secret = c.env.JWT_SECRET
 
-  try {
-    await verify(tokenToVerify.split(' ')[1], secret);
-    await next();
-  } catch (error) {
-    console.log('Invalid token detection.:', error)
-    throw new HTTPException(401, { message: 'Not authorised.' })
-  }
-});
+//   try {
+//     await verify(tokenToVerify.split(' ')[1], secret);
+//     await next();
+//   } catch (error) {
+//     console.log('Invalid token detection.:', error)
+//     throw new HTTPException(401, { message: 'Not authorised.' })
+//   }
+// });
 
-api.get('/access', (c) => { return c.text('You are authorized') });
+// api.get('/access', (c) => { return c.json('You are authorized') });
 
-app.route('/api', api)
+// app.route('/api', api)
 
 export default app
 
