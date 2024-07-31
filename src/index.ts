@@ -104,7 +104,7 @@ app.post(
   '/sender',
   zValidator('json', messageSchema, (result, c) => {
     if(!result.success) {
-      return c.json({ message: '不正なデータが入力されています。' }, 400);
+      return c.json({ isSuccessful: false, message: '不正なデータが入力されています。' }, 400);
       }
     }),
   (c) => { 
@@ -112,10 +112,10 @@ app.post(
       const data = c.req.valid('json')
       console.log(data.email, data.message);
       // TODO(2024/07/27) Sending email method.
-      return c.json({ message: 'お問い合わせを受け付けました。' }, 200);
+      return c.json({ isSuccessful: true, message: 'お問い合わせを受け付けました。' }, 200);
     } catch (error) {
       console.error(error)
-      return c.json({ message: 'サーバーが停止しています。しばらくしてからもう一度お試しください。' }, 500);
+      return c.json({ isSuccessful: false, message: 'サーバーが停止しています。しばらくしてからもう一度お試しください。' }, 500);
     }
   }
 );
