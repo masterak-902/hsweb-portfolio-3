@@ -112,6 +112,11 @@ app.post(
       const data = c.req.valid('json')
       console.log(data.email, data.message);
       // TODO(2024/07/27) Sending email method.
+      // CloudFlare D1 -> https://developers.cloudflare.com/d1/
+
+      
+
+
       return c.json({ isSuccessful: true, message: 'お問い合わせを受け付けました。' }, 200);
     } catch (error) {
       console.error(error)
