@@ -6,10 +6,13 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.2.2",
+    "@prisma/adapter-d1": "^5.17.0",
+    "@prisma/client": "^5.17.0",
     "hono": "^4.5.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240529.0",
+    "prisma": "^5.17.0",
     "wrangler": "^3.67.1"
   }
 }
