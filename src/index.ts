@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import { PrismaClient } from '@prisma/client'
+import { PrismaD1 } from '@prisma/adapter-d1'
 // import { basicAuth } from 'hono/basic-auth'
 // import { sign, verify, jwt } from 'hono/jwt'
 import { prettyJSON } from 'hono/pretty-json'
@@ -13,7 +15,21 @@ import type { JwtVariables } from 'hono/jwt'
 
 type Variables = JwtVariables
 
-const app = new Hono<{ Bindings: Bindings, Variables: Variables }>();
+// Binding of API credentials.
+type Bindings = {
+  POST_API_KEY   : string
+  // JWT_SECRET: string
+  // USERNAME  : string
+  // PASSWORD  : string
+  DB: D1Database;
+}
+
+type POSTmessage = {
+  email: string;
+  message: string;
+}
+
+const app = new Hono<{ Bindings: Bindings, Variables: Variables, POSTmessage:POSTmessage }>();
 
 // Hono Logger middleware
 app.use(logger());
@@ -25,15 +41,7 @@ app.use(prettyJSON());
 app.notFound((c) => c.json({ message: 'Not Found', ok: false }, 404));
 
 // Is the server alive ?
-app.get('/ping', (c) => { return c.text('hsweb app is alive.') });
-
-// Binding of API credentials.
-type Bindings = {
-  API_KEY   : string
-  JWT_SECRET: string
-  USERNAME  : string
-  PASSWORD  : string
-}
+app.get('/ping', (c) => { return c.json({message:'hsweb app is alive.'}, 200) });
 
 // https://hono.dev/docs/middleware/builtin/cors
 // origin: 'http://localhost:3000' -> Deno test origin
@@ -93,7 +101,7 @@ const messageSchema = z.object({
 
 app.use('/sender/*', async (c, next) => {
   const apiKey = c.req.header('X-API-KEY')
-  const API_KEY = c.env.API_KEY
+  const API_KEY = c.env.POST_API_KEY
   if (apiKey !== API_KEY) {
     throw new HTTPException(403);
   }
@@ -107,15 +115,22 @@ app.post(
       return c.json({ isSuccessful: false, message: '不正なデータが入力されています。' }, 400);
       }
     }),
-  (c) => { 
+  async (c) => { 
     try {
-      const data = c.req.valid('json')
-      console.log(data.email, data.message);
-      // TODO(2024/07/27) Sending email method.
-      // CloudFlare D1 -> https://developers.cloudflare.com/d1/
-
+      const adapter = new PrismaD1(c.env.DB);
+      const prisma = new PrismaClient({ adapter });
+      const data = await c.req.valid('json');
       
+      const user = await prisma.messageHistory.create({
+        data: {
+          email: data.email,
+          message: data.message,
+        },
+      });
 
+      console.log("メッセージが届きました -> ", user);
+
+      await prisma.$disconnect();
 
       return c.json({ isSuccessful: true, message: 'お問い合わせを受け付けました。' }, 200);
     } catch (error) {
