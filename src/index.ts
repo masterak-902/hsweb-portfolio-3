@@ -18,9 +18,9 @@ type Variables = JwtVariables
 // Binding of API credentials.
 type Bindings = {
   POST_API_KEY   : string
-  JWT_SECRET: string
-  USERNAME  : string
-  PASSWORD  : string
+  // JWT_SECRET: string
+  // USERNAME  : string
+  // PASSWORD  : string
   DB: D1Database;
 }
 
